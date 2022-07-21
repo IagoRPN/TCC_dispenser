@@ -1,16 +1,31 @@
-#include <WiFi.h>
-#include "time.h"
+#include <IOXhop_FirebaseESP32.h> //biblioteca de integração do firebase
+#include <IOXhop_FirebaseStream.h>
 
-const char* ssid       = "";
-const char* password   = "";
+#include <WiFi.h> //biblioteca do wifi
+#include "time.h" //biblioteca de informações de horas
 
-const char* ntpServer = "0.br.pool.ntp.org";
-const long  gmtOffset_sec = -3 * 3600;
-const int   daylightOffset_sec = 0;
+#define tamanho_rotina 60 //quantidade de horarios disponiveis para programar
 
-int horario_rotina[10][2] = {
-  {1,35}
+#define ssid  "Ranadaia"; //ssid do wifi
+#define password "D@vi2410"; //senha do wifi
+#define firebase_host "https://dispensador-remedios-default-rtdb.firebaseio.com/" //host do firebase 
+#define firebase_auth "token_or_secret" //chave de autenticação do firebase
 
+//estrutura de dados para armazenar dados da rotina
+struct DadosRotina {  
+  int hora;
+  int minuto;
+  int slot;
+  char* nome;
+  };
+
+const char* ntpServer = "0.br.pool.ntp.org"; //endereço do servidor de tempo
+const long  gmtOffset_sec = -3 * 3600; //config do fuso horario br
+const int   daylightOffset_sec = 0; //horário de verão
+
+/*
+DadosRotina horario_rotina[tamanho_rotina] = {
+  
   };
 
 
@@ -48,22 +63,17 @@ int get_LocalTimeMinuto()
   return timeinfo.tm_min;
 }
 /***************************************************************************************/
-void CHECA_HORARIO(int hora_aux, int min_aux, int rotina[10][2])
+bool CHECA_HORARIO(int rotina[tamanho_rotina][2])
 {
-   for(int i = 0; i < 10; i++)
+  for(int i = 0; i < 10; i++)
    {
-      if(hora_aux == rotina[i][0] && min_aux <= rotina[i][1])
+      if(get_LocalTimeHora() == rotina[i][0] && get_LocalTimeMinuto() == rotina[i][1])
       {
         Serial.println("DEU O HORÁRIO");
+        return true;
       }
    }
-}
-
-/***************************************************************************************/
-/*
-void GUARDA_HORARIO(int hora_aux, int min_aux)
-{
-  
+   return false;
 }
 /***************************************************************************************/
 void CONECTA_WIFI() //Função para conectar no wifi
@@ -77,26 +87,13 @@ void CONECTA_WIFI() //Função para conectar no wifi
   Serial.println(" CONNECTED");
 }
 /***************************************************************************************/
-void DESCONECTA_WIFI() //Função para desconectar do wifi
+void MOSTRA_HORARIO()
 {
-  WiFi.disconnect(true);
-  WiFi.mode(WIFI_OFF);
-}
-/***************************************************************************************/
-void MOSTRA_UnixTime() //Função para mostrar no monitor serial o tempo no sistema unix
-{
-  time_t seconds;
-  Serial.println(time(&seconds));
-}
-/***************************************************************************************/
-long get_UnixTime() //Função para obter o tempo no sistema Unix
-{
-  time_t seconds;
-  return time(&seconds);
+  Serial.print((String)get_LocalTimeHora() + " : " + (String)get_LocalTimeMinuto() + '\n');
 }
 /***************************************************************************************/
 
-/***************************************************************************************/
+
 void setup() //Função de configuração
 {
   Serial.begin(115200);
@@ -104,19 +101,21 @@ void setup() //Função de configuração
   CONECTA_WIFI();
   configTime(gmtOffset_sec, daylightOffset_sec, ntpServer); //Conecta no servidor e obtem o horario local
   MOSTRA_LocalTime();
-  DESCONECTA_WIFI();
 
 }
 
 void loop() //Função principal de execução
 {
-  //MOSTRA_UnixTime();
-  int h = get_LocalTimeHora();
-  int m = get_LocalTimeMinuto();
-  CHECA_HORARIO(h,m,horario_rotina);
-  //Serial.print((String)h + ':' + (String)m + '\n');
-  //printLocalTime();
+  MOSTRA_HORARIO();
   Serial.println('.');
   delay(1000);
+
+  //Checa firebase
+  
+  //Verifica rotina
+  if (CHECA_HORARIO(horario_rotina))
+  {
+    //aciona os motores dos compartimentos
+  }
   
 }
