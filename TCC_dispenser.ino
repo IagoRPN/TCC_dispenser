@@ -1,10 +1,14 @@
-#include <IOXhop_FirebaseESP32.h> //biblioteca de integração do firebase
+//Bibliotecas utilizadas
+#include <Stepper.h>
+#include <LiquidCrystal_I2C.h>
+#include <WiFi.h>
+#include <Vector.h>
+#include <Wire.h>
+#include <IOXhop_FirebaseESP32.h> 
 #include <IOXhop_FirebaseStream.h>
+#include "time.h" 
 
-#include <WiFi.h> //biblioteca do wifi
-#include "time.h" //biblioteca de informações de horas
-
-
+//Definição dos nomes
 #define ssid  "Ranadaia" //ssid do wifi
 #define password "D@vi2410" //senha do wifi
 #define firebase_host "https://dispensador-remedios-default-rtdb.firebaseio.com/" //host do firebase 
@@ -27,11 +31,18 @@
 #define PINO_BOTAO 39
 #define PINO_BUZZER 15
 
+//Definição das variaveis do motor
+#define SPEED 30
+#define PASSOS 4096
+
+LiquidCrystal_I2C lcd(0x27,20,4);
+Stepper motor(64, PINO_MOTOR1, PINO_MOTOR2 ,PINO_MOTOR3 ,PINO_MOTOR4);
+
 const char* ntpServer = "0.br.pool.ntp.org"; //endereço do servidor de tempo
 const long  gmtOffset_sec = -3 * 3600; //config do fuso horario br
-const int   daylightOffset_sec = 0; //horário de verão
+const byte   daylightOffset_sec = 0; //horário de verão
 
-const int tam_list = 2;
+const byte tam_lista= 2; //Variavel com o tamanho da lista de remedios do paciente
 
 //estrutura de dados para armazenar dados da rotina
 typedef struct {
@@ -39,102 +50,174 @@ typedef struct {
   int minuto;
   int slot;
   String nome;
+  int quantidade;
 } DadosRemedio;
 
-DadosRemedio rotina[tam_list];
+DadosRemedio rotina[tam_lista];
 
+void InicializaLCD(){
+  lcd.begin (20,4);
+  lcd.setBacklight(HIGH);
+  lcd.setCursor(5,0);
+  lcd.print("DISPENSER");
+  lcd.setCursor(5,1);
+  lcd.print("AUTOMÁTICO");
+  lcd.setCursor(3,2);
+  lcd.print("ENG. ELÉTRICA");
+  lcd.setCursor(8,3);
+  lcd.print("UNIP");
+}
+
+void MostraMenu(){
+  lcd.clear();
+  //Mostra Horário
+  lcd.setCursor(15,0);
+  lcd.print(String(get_LocalTimeHora()) + ":" + String(get_LocalTimeMinuto()));
+  //
+}
 void AtualizaLista() {
-  for (int i = 0; i <= tam_list - 1; i++){
+  for (int i = 0; i <= tam_lista - 1; i++){
    rotina[i].hora = Firebase.getInt("/"+String(i)+"/hora");
-   rotina[i].minuto = Firebase.getInt("/"+String(i)+"/hora");
+   rotina[i].minuto = Firebase.getInt("/"+String(i)+"/minuto");
+   rotina[i].slot = Firebase.getInt("/"+String(i)+"/slot");
+   rotina[i].nome = Firebase.getString("/"+String(i)+"/nome");
+   rotina[i].quantidade = Firebase.getInt("/"+String(i)+"/quantidade");
   }
 }
 
-/***************************************************************************************/
-void MOSTRA_LocalTime() //Função para imprimir o tempo local
-{
-  struct tm timeinfo;
-  if(!getLocalTime(&timeinfo))
-  {
-    Serial.println("Falha ao obter tempo");
-    return;
-  }
-  Serial.println(&timeinfo, "%A, %B %d %Y %H:%M:%S");
+void AcionaBuzzer(){
+  
 }
-/***************************************************************************************/
-int get_LocalTimeHora()
-{
+
+void DesacionaBuzzer(){
+  
+}
+
+void AcionaMotor(byte porta_motor){
+  if (porta_motor == 1){
+    digitalWrite(PINO_EN1, HIGH);
+    motor.setSpeed(SPEED);
+    motor.step(PASSOS);
+   digitalWrite(PINO_EN1, LOW);
+  }
+    if (porta_motor == 2){
+    digitalWrite(PINO_EN2, HIGH);
+    motor.setSpeed(SPEED);
+    motor.step(PASSOS);
+   digitalWrite(PINO_EN2, LOW);
+  }
+    if (porta_motor == 3){
+    digitalWrite(PINO_EN3, HIGH);
+    motor.setSpeed(SPEED);
+    motor.step(PASSOS);
+   digitalWrite(PINO_EN3, LOW);
+  }
+    if (porta_motor == 4){
+    digitalWrite(PINO_EN4, HIGH);
+    motor.setSpeed(SPEED);
+    motor.step(PASSOS);
+   digitalWrite(PINO_EN4, LOW);
+  }
+    if (porta_motor == 5){
+    digitalWrite(PINO_EN5, HIGH);
+    motor.setSpeed(SPEED);
+    motor.step(PASSOS);
+   digitalWrite(PINO_EN5, LOW);
+  }
+    if (porta_motor == 6){
+    digitalWrite(PINO_EN6, HIGH);
+    motor.setSpeed(SPEED);
+    motor.step(PASSOS);
+   digitalWrite(PINO_EN6, LOW);
+  }
+}
+
+int get_LocalTimeHora(){
   struct tm timeinfo;
   if(!getLocalTime(&timeinfo))
   {
-    Serial.println("Falha ao obter tempo");
+    //Serial.println("Falha ao obter tempo");
     return 0;
   }
   return timeinfo.tm_hour;
 }
 
-int get_LocalTimeMinuto()
-{
+int get_LocalTimeMinuto(){
   struct tm timeinfo;
   if(!getLocalTime(&timeinfo))
   {
-    Serial.println("Falha ao obter tempo");
+   // Serial.println("Falha ao obter tempo");
     return 0;
   }
   return timeinfo.tm_min;
 }
-/***************************************************************************************/
-bool ChecaHorario(int rotina[tam_list])
+
+void LiberaDoses(DadosRemedio rotina[tam_lista]) //Essa função recebe um array com todas as quantidades de doses 
 {
-  for(int i = 0; i < 10; i++)
+  for(int i = 0; i < tam_lista ; i++)
    {
       if(get_LocalTimeHora() == rotina[i].hora && get_LocalTimeMinuto() == rotina[i].minuto)
       {
-        Serial.println("DEU O HORÁRIO");
-        return true;
+        //Aciona os motores do respectivo compartimento
+        AcionaMotor(rotina[i].slot);
+        AcionaBuzzer();
+        delay(1000);       
+        for (byte i = 0; i < 2; i++){
+          if (PINO_SENSOR == LOW){  //O sensor atua com lógica negativa
+            lcd.clear();
+            lcd.setCursor(0,0);
+            lcd.print(rotina[i].nome);
+            lcd.setCursor(1,0);
+            lcd.print("liberado");
+          }
+          lcd.clear();
+          lcd.setCursor(0,1);
+          lcd.print(String(rotina[i].slot) + " vazio");
+        }
       }
    }
-   return false;
 }
-/***************************************************************************************/
+
 void ConectaWiFi() //Função para conectar no wifi
 {
-  Serial.printf("Connecting to %s ", ssid);
+  //Serial.printf("Connecting to %s ", ssid);
   WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED) {
       delay(500);
-      Serial.print(".");
+      //Serial.print(".");
   }
-  Serial.println(" CONNECTED");
+  //Serial.println(" CONNECTED");
 }
-/***************************************************************************************/
-void MostraHorario()
-{
-  Serial.print((String)get_LocalTimeHora() + " : " + (String)get_LocalTimeMinuto() + '\n');
-}
-/***************************************************************************************/
-
 
 void setup() //Função de configuração
 {
   Serial.begin(115200);
-  
+  //Desliga todos os pinos
+  digitalWrite(PINO_EN1, LOW); 
+  digitalWrite(PINO_EN2, LOW);
+  digitalWrite(PINO_EN3, LOW);
+  digitalWrite(PINO_EN4, LOW);
+  digitalWrite(PINO_EN5, LOW);
+  digitalWrite(PINO_EN6, LOW);
+  InicializaLCD();
+  delay(2000);
   ConectaWiFi();
+  lcd.clear();
+  lcd.setCursor(0,0);
+  lcd.print("WIFI CONECTADO");
   Firebase.begin(firebase_host, firebase_auth);
+  lcd.setCursor(0,1);
+  lcd.print("FIREBASE CONECTADO");
   configTime(gmtOffset_sec, daylightOffset_sec, ntpServer); //Conecta no servidor e obtem o horario local
-  MOSTRA_LocalTime();
-
+  //MOSTRA_LocalTime();
 }
 
 void loop() //Função principal de execução
 {
+  MostraMenu();
+  //ChecaBotoes();
+  //AtualizaMenu();
   AtualizaLista();
-  MostraHorario();
-  Serial.println('.');
-  delay(1000);
-
-  //Checa firebase
-  
+  LiberaDoses(rotina);
 }
   
-}
