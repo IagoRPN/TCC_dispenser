@@ -2,7 +2,6 @@
 #include <Stepper.h>
 #include <LiquidCrystal_I2C.h>
 #include <WiFi.h>
-#include <Vector.h>
 #include <Wire.h>
 #include <IOXhop_FirebaseESP32.h> 
 #include <IOXhop_FirebaseStream.h>
@@ -23,8 +22,6 @@
 #define PINO_EN2 25
 #define PINO_EN3 33
 #define PINO_EN4 32
-#define PINO_EN5 4
-#define PINO_EN6 2
 #define PINO_SENSOR 36
 #define PINO_LCD_TX 23
 #define PINO_LCD_RX 22
@@ -56,8 +53,8 @@ typedef struct {
 DadosRemedio rotina[tam_lista];
 
 void InicializaLCD(){
-  lcd.begin (20,4);
-  lcd.setBacklight(HIGH);
+  lcd.init();
+  lcd.backlight();
   lcd.setCursor(5,0);
   lcd.print("DISPENSER");
   lcd.setCursor(5,1);
@@ -75,6 +72,39 @@ void MostraMenu(){
   lcd.print(String(get_LocalTimeHora()) + ":" + String(get_LocalTimeMinuto()));
   //
 }
+
+char* comando = "n";
+
+char* Leitura_Botao(int porta){
+  int l1, l2, l3, l4, leitura = 0;
+  l1 = analogRead(porta);
+  l2 = analogRead(porta);
+  l3 = analogRead(porta);
+  l4 = analogRead(porta);
+
+  leitura = (l1+l2+l3+l4)/4;
+
+  if (leitura == 0){
+    comando = "SW1";
+  }
+  else if (leitura > 0 && leitura <= 100){
+    comando = "SW2";
+  }
+  else if (leitura >= 200 && leitura <= 400){
+    comando = "SW3";
+  }
+  else if (leitura >= 600 && leitura <= 800){
+    comando = "SW4";
+  }
+  else if (leitura >= 1800 && leitura <= 2400){
+    comando = "SW5";
+  }
+  else{
+    comando = "n";
+  }
+  return comando;
+}
+
 void AtualizaLista() {
   for (int i = 0; i <= tam_lista - 1; i++){
    rotina[i].hora = Firebase.getInt("/"+String(i)+"/hora");
@@ -93,42 +123,31 @@ void DesacionaBuzzer(){
   
 }
 
-void AcionaMotor(byte porta_motor){
+void AcionaMotor(int porta_motor){
+  motor.setSpeed(SPEED);
   if (porta_motor == 1){
     digitalWrite(PINO_EN1, HIGH);
-    motor.setSpeed(SPEED);
+    delay(100);
     motor.step(PASSOS);
-   digitalWrite(PINO_EN1, LOW);
+    digitalWrite(PINO_EN1, LOW);
   }
     if (porta_motor == 2){
     digitalWrite(PINO_EN2, HIGH);
-    motor.setSpeed(SPEED);
+    delay(100);
     motor.step(PASSOS);
-   digitalWrite(PINO_EN2, LOW);
+    digitalWrite(PINO_EN2, LOW);
   }
     if (porta_motor == 3){
     digitalWrite(PINO_EN3, HIGH);
-    motor.setSpeed(SPEED);
+    delay(100);
     motor.step(PASSOS);
-   digitalWrite(PINO_EN3, LOW);
+    digitalWrite(PINO_EN3, LOW);
   }
     if (porta_motor == 4){
     digitalWrite(PINO_EN4, HIGH);
-    motor.setSpeed(SPEED);
+    delay(100);
     motor.step(PASSOS);
-   digitalWrite(PINO_EN4, LOW);
-  }
-    if (porta_motor == 5){
-    digitalWrite(PINO_EN5, HIGH);
-    motor.setSpeed(SPEED);
-    motor.step(PASSOS);
-   digitalWrite(PINO_EN5, LOW);
-  }
-    if (porta_motor == 6){
-    digitalWrite(PINO_EN6, HIGH);
-    motor.setSpeed(SPEED);
-    motor.step(PASSOS);
-   digitalWrite(PINO_EN6, LOW);
+    digitalWrite(PINO_EN4, LOW);
   }
 }
 
@@ -158,21 +177,20 @@ void LiberaDoses(DadosRemedio rotina[tam_lista]) //Essa função recebe um array
    {
       if(get_LocalTimeHora() == rotina[i].hora && get_LocalTimeMinuto() == rotina[i].minuto)
       {
-        //Aciona os motores do respectivo compartimento
-        AcionaMotor(rotina[i].slot);
+        //Avisa o usuario
+        lcd.setCursor(0,1);
+        lcd.print(rotina[i].nome);
         AcionaBuzzer();
         delay(1000);       
-        for (byte i = 0; i < 2; i++){
-          if (PINO_SENSOR == LOW){  //O sensor atua com lógica negativa
-            lcd.clear();
-            lcd.setCursor(0,0);
-            lcd.print(rotina[i].nome);
-            lcd.setCursor(1,0);
-            lcd.print("liberado");
+        if(Leitura_Botao(PINO_BOTAO) == "SW5"){ //Aguarda pressionar o botão
+          for (byte i = 0; i < 2; i++){
+            AcionaMotor(rotina[i].slot);
+            if (PINO_SENSOR == LOW){
+              lcd.setCursor(1,1);
+              lcd.print("LIBERADO");
+              return;
           }
-          lcd.clear();
-          lcd.setCursor(0,1);
-          lcd.print(String(rotina[i].slot) + " vazio");
+         }
         }
       }
    }
@@ -197,8 +215,6 @@ void setup() //Função de configuração
   digitalWrite(PINO_EN2, LOW);
   digitalWrite(PINO_EN3, LOW);
   digitalWrite(PINO_EN4, LOW);
-  digitalWrite(PINO_EN5, LOW);
-  digitalWrite(PINO_EN6, LOW);
   InicializaLCD();
   delay(2000);
   ConectaWiFi();
@@ -215,8 +231,6 @@ void setup() //Função de configuração
 void loop() //Função principal de execução
 {
   MostraMenu();
-  //ChecaBotoes();
-  //AtualizaMenu();
   AtualizaLista();
   LiberaDoses(rotina);
 }
