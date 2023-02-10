@@ -8,6 +8,6 @@ A proposta deste projeto é desenvolver um equipamento de uso medicinal para aju
 
 Por meio de um aplicativo, o usuário pode cadastrar informações como horários, quantidades e nome do medicamento. Essas informações estarão disponíves em um banco de dados do Google Firebase.
 
-O firmware do Dispensador irá atualizar de hora em hora para obter as informações do github e armazenar na memória de programa interno.
+O firmware do Dispensador irá atualizar de hora em hora para obter as informações dos horários de cada compartimento, e nos horários programados, o remédio será liberado.
 
-em construção...
+O dispensador possui uma interface de LCD que informa a quantidade de medicamentos, leds indicadores de funcionamento e botão de acionamento e buzzer para alarme sonoro.
